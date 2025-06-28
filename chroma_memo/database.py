@@ -163,6 +163,54 @@ class ChromaMemoDatabase:
         except Exception as e:
             raise RuntimeError(f"Failed to search in project '{project_name}': {str(e)}")
     
+    def get_knowledge_by_id(self, project_name: str, entry_id: str) -> Optional[KnowledgeEntry]:
+        """Get a specific knowledge entry by ID (supports partial ID)"""
+        if not self.project_exists(project_name):
+            raise ValueError(f"Project '{project_name}' does not exist.")
+        
+        try:
+            collection_name = self._get_collection_name(project_name)
+            collection = self.client.get_collection(collection_name)
+            
+            # First try exact match
+            results = collection.get(ids=[entry_id])
+            
+            if results['ids'] and results['ids'][0]:
+                # Exact match found
+                doc_id = results['ids'][0]
+                content = results['documents'][0]
+                metadata = results['metadatas'][0]
+                return KnowledgeEntry.from_chroma_result(doc_id, content, metadata)
+            
+            # If not found and entry_id is short (partial ID), search through all entries
+            if len(entry_id) < 36:  # UUID is 36 chars
+                all_results = collection.get()
+                if all_results['ids']:
+                    # Find entries that start with the partial ID
+                    matching_entries = []
+                    for i, doc_id in enumerate(all_results['ids']):
+                        if doc_id.startswith(entry_id):
+                            matching_entries.append(i)
+                    
+                    if len(matching_entries) == 1:
+                        # Exactly one match found
+                        idx = matching_entries[0]
+                        return KnowledgeEntry.from_chroma_result(
+                            all_results['ids'][idx],
+                            all_results['documents'][idx],
+                            all_results['metadatas'][idx]
+                        )
+                    elif len(matching_entries) > 1:
+                        # Multiple matches found
+                        raise ValueError(f"Multiple entries found starting with '{entry_id}'. Please provide more characters.")
+            
+            return None  # Entry doesn't exist
+            
+        except ValueError:
+            raise  # Re-raise ValueError for multiple matches
+        except Exception as e:
+            raise RuntimeError(f"Failed to get knowledge from project '{project_name}': {str(e)}")
+
     def delete_knowledge(self, project_name: str, entry_id: str) -> bool:
         """Delete knowledge from a project"""
         if not self.project_exists(project_name):

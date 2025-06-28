@@ -75,5 +75,5 @@ class AppConfig(BaseModel):
     db_path: str = Field(default="~/.chroma-memo/db", description="ChromaDB path")
     config_path: str = Field(default="~/.chroma-memo/config.yaml", description="Config file path")
     max_results: int = Field(default=10, description="Maximum search results")
-    similarity_threshold: float = Field(default=0.7, description="Similarity threshold for searches")
+    similarity_threshold: float = Field(default=0.1, description="Similarity threshold for searches")
     export_formats: List[str] = Field(default=["json", "csv", "markdown"], description="Supported export formats") 

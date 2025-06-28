@@ -227,6 +227,48 @@ def search(project_name: str, query: str, max_results: int):
         raise click.ClickException(str(e))
 
 
+@main.command()
+@click.argument('project_name')
+@click.argument('entry_id')
+def get(project_name: str, entry_id: str):
+    """指定IDのナレッジを取得"""
+    try:
+        entry = database.get_knowledge_by_id(project_name, entry_id)
+        
+        if entry is None:
+            console.print(f"⚠️  指定されたID '{entry_id}' のナレッジが見つかりませんでした。", style="yellow")
+            return
+        
+        # Display the knowledge entry
+        console.print(f"📄 ナレッジ詳細 (ID: {entry.id})", style="blue")
+        console.print()
+        
+        # Create panel for the entry
+        content_text = Text(entry.content)
+        id_text = Text(f"ID: {entry.id}", style="dim")
+        project_text = Text(f"プロジェクト: {entry.project}", style="dim")
+        created_text = Text(f"作成: {entry.created_at.strftime('%Y-%m-%d %H:%M')}", style="dim")
+        updated_text = Text(f"更新: {entry.updated_at.strftime('%Y-%m-%d %H:%M')}", style="dim")
+        source_text = Text(f"ソース: {entry.source.value}", style="dim")
+        
+        header = ""
+        if entry.tags:
+            header = f"タグ: {', '.join(entry.tags)}"
+        
+        panel_content = f"{content_text}\n\n{id_text} | {project_text}\n{created_text} | {updated_text} | {source_text}"
+        
+        console.print(Panel(
+            panel_content,
+            title=header if header else "ナレッジエントリ",
+            title_align="left",
+            border_style="blue"
+        ))
+        
+    except Exception as e:
+        console.print(f"❌ 取得エラー: {str(e)}", style="red")
+        raise click.ClickException(str(e))
+
+
 @main.command(name='del')
 @click.argument('project_name')
 @click.argument('entry_id')
@@ -250,7 +292,8 @@ def delete(project_name: str, entry_id: str, confirm: bool):
 
 @main.command()
 @click.argument('project_name')
-def list(project_name: str):
+@click.option('--full-id', is_flag=True, help='完全なIDを表示')
+def list(project_name: str, full_id: bool):
     """プロジェクトの全ナレッジを一覧表示"""
     try:
         entries = database.list_knowledge(project_name)
@@ -263,7 +306,9 @@ def list(project_name: str):
         console.print()
         
         table = Table(show_header=True, header_style="bold blue")
-        table.add_column("ID", style="dim", width=8)
+        # Adjust ID column width based on full_id flag
+        id_width = 36 if full_id else 8
+        table.add_column("ID", style="dim", width=id_width)
         table.add_column("内容", min_width=30)
         table.add_column("タグ", style="cyan")
         table.add_column("作成日時", style="dim")
@@ -273,8 +318,11 @@ def list(project_name: str):
             tags_str = ", ".join(entry.tags) if entry.tags else "-"
             created_str = entry.created_at.strftime('%m-%d %H:%M')
             
+            # Show full ID if requested, otherwise first 8 chars
+            id_display = entry.id if full_id else entry.id[:8]
+            
             table.add_row(
-                entry.id[:8],
+                id_display,
                 content_preview,
                 tags_str,
                 created_str
@@ -355,7 +403,7 @@ def info(project_name: str):
 
 
 @main.command()
-@click.option('--set-api-key', type=click.Choice(['openai']), help='APIキーを設定')
+@click.option('--set-api-key', type=click.Choice(['openai', 'google']), help='APIキーを設定')
 @click.option('--show-env-path', is_flag=True, help='.envファイルのパスを表示')
 @click.option('--show-db-path', is_flag=True, help='データベースパスを表示')
 @click.option('--show-all-paths', is_flag=True, help='全てのパスを表示')
@@ -364,9 +412,17 @@ def config(set_api_key: str, show_env_path: bool, show_db_path: bool, show_all_p
     try:
         if set_api_key == 'openai':
             api_key = click.prompt('OpenAI APIキーを入力してください', hide_input=True)
-            config_manager.set_api_key(api_key)
+            config_manager.set_api_key(api_key, 'openai')
             env_path = config_manager.get_env_file_path()
-            console.print("✅ APIキーを設定しました:", style="green")
+            console.print("✅ OpenAI APIキーを設定しました:", style="green")
+            console.print(f"保存先: {env_path}")
+            return
+        
+        if set_api_key == 'google':
+            api_key = click.prompt('Google API キーを入力してください', hide_input=True)
+            config_manager.set_api_key(api_key, 'google')
+            env_path = config_manager.get_env_file_path()
+            console.print("✅ Google API キーを設定しました:", style="green")
             console.print(f"保存先: {env_path}")
             return
         
@@ -454,6 +510,48 @@ def config(set_api_key: str, show_env_path: bool, show_db_path: bool, show_all_p
         
     except Exception as e:
         console.print(f"❌ 設定エラー: {str(e)}", style="red")
+        raise click.ClickException(str(e))
+
+
+@main.command()
+@click.argument('project_name', required=False)
+@click.option('--auto-init', is_flag=True, default=True, help='プロジェクトが存在しない場合、自動で初期化する')
+def serve(project_name: str, auto_init: bool):
+    """MCPサーバーを起動してClaude Code/Cursorからアクセス可能にする"""
+    try:
+        # Import here to avoid circular imports and handle missing mcp gracefully
+        try:
+            from .mcp_server import start_mcp_server
+        except ImportError as e:
+            console.print("❌ MCP依存関係が見つかりません。以下のコマンドでインストールしてください:", style="red")
+            console.print("pip install mcp", style="yellow")
+            raise click.ClickException("MCP依存関係が不足しています")
+        
+        if project_name:
+            # Check if project exists
+            if not database.project_exists(project_name):
+                if auto_init:
+                    console.print(f"📁 プロジェクト '{project_name}' が存在しません。自動で作成します...", style="yellow")
+                    if database.create_project(project_name):
+                        console.print(f"✅ プロジェクト '{project_name}' を作成しました。", style="green")
+                    else:
+                        console.print(f"⚠️  プロジェクト '{project_name}' は既に存在します。", style="yellow")
+                else:
+                    console.print(f"❌ プロジェクト '{project_name}' が存在しません。", style="red")
+                    console.print(f"プロジェクトを作成するには: chroma-memo init {project_name}", style="blue")
+                    raise click.ClickException(f"プロジェクト '{project_name}' が存在しません")
+            
+            console.print(f"🚀 MCPサーバーを起動しています (プロジェクト: {project_name})...", style="blue")
+        else:
+            console.print("🚀 MCPサーバーを起動しています (全プロジェクト対応)...", style="blue")
+            
+        # Start MCP server
+        start_mcp_server(project_name, auto_init)
+        
+    except KeyboardInterrupt:
+        console.print("\n🛑 MCPサーバーを停止しました。", style="yellow")
+    except Exception as e:
+        console.print(f"❌ MCPサーバー起動エラー: {str(e)}", style="red")
         raise click.ClickException(str(e))
 
 

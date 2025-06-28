@@ -7,5 +7,8 @@ pydantic>=2.5.0
 python-dotenv>=1.0.0
 PyYAML>=6.0.1
 
+# MCP dependencies
+mcp>=1.2.0
+
 # Build dependencies
 pyinstaller>=6.0.0 
