@@ -109,32 +109,38 @@ class ConfigManager:
         self._config = config
         self.save_config(config)
     
-    def set_api_key(self, api_key: str) -> None:
+    def set_api_key(self, api_key: str, provider: str = 'openai') -> None:
         """Set API key in .env file"""
         env_content = ""
+        
+        # Determine the environment variable name and comments
+        if provider == 'google':
+            env_key = 'GOOGLE_API_KEY'
+            comment = '# Google API Key\n# Get your API key from: https://aistudio.google.com/app/apikey\n'
+        else:  # openai
+            env_key = 'OPENAI_API_KEY'
+            comment = '# OpenAI API Key\n# Get your API key from: https://platform.openai.com/api-keys\n'
         
         # Read existing .env file if it exists
         if self.env_path.exists():
             with open(self.env_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
-            # Update existing OPENAI_API_KEY line or add new one
+            # Update existing API key line or add new one
             found = False
             for i, line in enumerate(lines):
-                if line.strip().startswith('OPENAI_API_KEY='):
-                    lines[i] = f'OPENAI_API_KEY={api_key}\n'
+                if line.strip().startswith(f'{env_key}='):
+                    lines[i] = f'{env_key}={api_key}\n'
                     found = True
                     break
             
             if not found:
-                lines.append(f'OPENAI_API_KEY={api_key}\n')
+                lines.append(f'{env_key}={api_key}\n')
             
             env_content = ''.join(lines)
         else:
-            # Create new .env file
-            env_content = f"""# OpenAI API Key
-# Get your API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY={api_key}
+            # Create new .env file based on .env.example
+            env_content = f"""{comment}{env_key}={api_key}
 """
         
         # Write to .env file
