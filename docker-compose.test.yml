@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  test-ubuntu:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: chroma-memo-test:ubuntu
+    container_name: chroma-memo-test-ubuntu
+    volumes:
+      - .:/app:ro
+      - test-workspace:/workspace
+    environment:
+      - OPENAI_API_KEY=test-dummy-key
+      - GOOGLE_API_KEY=test-dummy-google-key
+      - USE_API=OPENAI
+    command: /app/test_install.sh
+    
+  test-debian:
+    build:
+      context: .
+      dockerfile: Dockerfile.test.debian
+    image: chroma-memo-test:debian
+    container_name: chroma-memo-test-debian
+    volumes:
+      - .:/app:ro
+      - test-workspace:/workspace
+    environment:
+      - OPENAI_API_KEY=test-dummy-key
+      - GOOGLE_API_KEY=test-dummy-google-key
+      - USE_API=OPENAI
+    command: /app/test_install.sh
+
+volumes:
+  test-workspace:

@@ -1,0 +1,50 @@
+# Chroma-Memo インストールテスト用Dockerfile (Debian版)
+FROM debian:bullseye
+
+# 基本パッケージのインストール
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    sudo \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# pipxをpip経由でインストール
+RUN pip3 install --user pipx
+
+# pipxのパス設定
+ENV PATH="/root/.local/bin:${PATH}"
+RUN python3 -m pipx ensurepath
+
+# テストユーザーの作成（sudo権限付き）
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser:testpass" | chpasswd && \
+    usermod -aG sudo testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# 作業ディレクトリの設定
+WORKDIR /app
+
+# アプリケーションファイルのコピー
+COPY . /app/
+
+# 権限の設定
+RUN chown -R testuser:testuser /app
+
+# テスト用の作業ディレクトリを作成
+RUN mkdir -p /home/testuser/work && \
+    chown -R testuser:testuser /home/testuser/work
+
+# デフォルトはtestuserで実行
+USER testuser
+
+# testuserでもpipxをインストール
+RUN pip3 install --user pipx && \
+    python3 -m pipx ensurepath
+
+ENV PATH="/home/testuser/.local/bin:${PATH}"
+
+# テストスクリプトのエントリーポイント
+CMD ["/bin/bash"]
