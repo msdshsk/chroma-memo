@@ -275,15 +275,19 @@ def start_mcp_server(project_name: str = None, auto_init: bool = True):
     """
     if project_name and auto_init:
         # Auto-initialize project if it doesn't exist
-        db = get_database()
-        if not db.project_exists(project_name):
-            print(f"📁 Project '{project_name}' does not exist. Creating...", file=sys.stderr)
-            try:
+        try:
+            db = get_database()
+            if not db.project_exists(project_name):
+                print(f"📁 Project '{project_name}' does not exist. Creating...", file=sys.stderr)
                 db.create_project(project_name)
                 print(f"✅ Project '{project_name}' created successfully", file=sys.stderr)
-            except Exception as e:
-                print(f"❌ Failed to create project '{project_name}': {e}", file=sys.stderr)
-                sys.exit(1)
+        except Exception as e:
+            import traceback
+            print(f"⚠️  Warning: Failed to auto-initialize project '{project_name}': {e}", file=sys.stderr)
+            print(f"🔍 Full error trace:", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            print(f"🔄 Server will continue without auto-initialization", file=sys.stderr)
+            # Don't exit - continue running the server
     
     # Start the server
     server = ChromaMemoMCPServer(project_name)

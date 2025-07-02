@@ -19,6 +19,7 @@ except ImportError:
 from .database import database
 from .models import SearchResult, ProjectInfo, KnowledgeEntry
 from .config import config_manager
+from . import __version__
 
 console = Console()
 
@@ -141,7 +142,7 @@ chroma-memo del {project_name} "$ARGUMENTS" --confirm
 
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="chroma-memo")
+@click.version_option(version=__version__, prog_name="chroma-memo")
 def main():
     """Chroma-Memo: Project-specific knowledge base using ChromaDB and OpenAI embeddings"""
     pass

@@ -1,4 +1,25 @@
 from setuptools import setup, find_packages
+import os
+import re
+
+# Read version, author, and email from __init__.py
+def get_package_info():
+    init_file = os.path.join(os.path.dirname(__file__), 'chroma_memo', '__init__.py')
+    with open(init_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+        
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", content, re.M)
+    author_match = re.search(r"^__author__ = ['\"]([^'\"]*)['\"]", content, re.M)
+    email_match = re.search(r"^__email__ = ['\"]([^'\"]*)['\"]", content, re.M)
+    
+    if not version_match:
+        raise RuntimeError("Unable to find version string.")
+    
+    return {
+        'version': version_match.group(1),
+        'author': author_match.group(1) if author_match else "Unknown",
+        'email': email_match.group(1) if email_match else "unknown@example.com"
+    }
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -6,11 +27,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
+# Get package information
+package_info = get_package_info()
+
 setup(
     name="chroma-memo",
-    version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    version=package_info['version'],
+    author=package_info['author'],
+    author_email=package_info['email'],
     description="Project-specific knowledge base using ChromaDB and OpenAI embeddings",
     long_description=long_description,
     long_description_content_type="text/markdown",

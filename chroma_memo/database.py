@@ -30,6 +30,10 @@ class ChromaMemoDatabase:
             # 最小限の設定でクライアントを初期化
             self.client = chromadb.PersistentClient(path=str(self.db_path))
         except Exception as e:
+            # エラーをログに出力
+            import sys
+            print(f"⚠️  ChromaDB PersistentClient initialization failed: {e}", file=sys.stderr)
+            print(f"📂 Attempted path: {self.db_path}", file=sys.stderr)
             # デフォルトのクライアントを使用
             self.client = chromadb.Client()
     
@@ -69,11 +73,16 @@ class ChromaMemoDatabase:
     
     def project_exists(self, project_name: str) -> bool:
         """Check if a project exists"""
+        import sys
         try:
             collection_name = self._get_collection_name(project_name)
+            print(f"🔍 Checking if project exists: '{project_name}' -> collection: '{collection_name}'", file=sys.stderr)
             self.client.get_collection(collection_name)
+            print(f"✅ Project '{project_name}' exists", file=sys.stderr)
             return True
-        except ValueError:
+        except Exception as e:
+            # Any exception means the collection doesn't exist
+            print(f"📝 Project '{project_name}' does not exist (Exception: {type(e).__name__}: {e})", file=sys.stderr)
             return False
     
     def add_knowledge(self, project_name: str, content: str, tags: Optional[List[str]] = None) -> str:
