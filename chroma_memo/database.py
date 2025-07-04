@@ -168,6 +168,13 @@ class ChromaMemoDatabase:
                         rank=i + 1
                     ))
             
+            # Sort by similarity score (descending) and then by updated_at (descending)
+            search_results.sort(key=lambda x: (-x.similarity_score, -x.entry.updated_at.timestamp()))
+            
+            # Update ranks after sorting
+            for i, result in enumerate(search_results):
+                result.rank = i + 1
+            
             return search_results
         except Exception as e:
             raise RuntimeError(f"Failed to search in project '{project_name}': {str(e)}")
@@ -219,6 +226,53 @@ class ChromaMemoDatabase:
             raise  # Re-raise ValueError for multiple matches
         except Exception as e:
             raise RuntimeError(f"Failed to get knowledge from project '{project_name}': {str(e)}")
+
+    def update_knowledge(self, project_name: str, entry_id: str, content: str, tags: Optional[List[str]] = None) -> bool:
+        """Update knowledge in a project"""
+        if not self.project_exists(project_name):
+            raise ValueError(f"Project '{project_name}' does not exist.")
+        
+        try:
+            collection_name = self._get_collection_name(project_name)
+            collection = self.client.get_collection(collection_name)
+            
+            # First, resolve partial ID if necessary
+            actual_entry_id = entry_id
+            if len(entry_id) < 36:  # Partial ID
+                entry = self.get_knowledge_by_id(project_name, entry_id)
+                if entry is None:
+                    return False
+                actual_entry_id = entry.id
+            
+            # Check if entry exists
+            results = collection.get(ids=[actual_entry_id])
+            if not results['ids']:
+                return False  # Entry doesn't exist
+            
+            # Get existing metadata
+            existing_metadata = results['metadatas'][0]
+            
+            # Update metadata
+            updated_metadata = existing_metadata.copy()
+            updated_metadata['updated_at'] = datetime.now().isoformat()
+            if tags is not None:
+                updated_metadata['tags'] = tags
+            
+            # Get new embedding
+            embedding = embedding_service.get_embedding(content)
+            
+            # Update the entry (ChromaDB doesn't have direct update, so we delete and add)
+            collection.delete(ids=[actual_entry_id])
+            collection.add(
+                ids=[actual_entry_id],
+                documents=[content],
+                embeddings=[embedding],
+                metadatas=[updated_metadata]
+            )
+            
+            return True
+        except Exception as e:
+            raise RuntimeError(f"Failed to update knowledge in project '{project_name}': {str(e)}")
 
     def delete_knowledge(self, project_name: str, entry_id: str) -> bool:
         """Delete knowledge from a project"""

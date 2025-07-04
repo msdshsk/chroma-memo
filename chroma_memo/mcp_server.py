@@ -73,7 +73,7 @@ class ChromaMemoMCPServer:
                     formatted_results.append(
                         f"\n#{i}{tags_str}\n"
                         f"Content: {entry.content}\n"
-                        f"Similarity: {similarity:.3f} | ID: {entry.id} | Created: {entry.created_at}"
+                        f"Similarity: {similarity:.3f} | ID: {entry.id} | Created: {entry.created_at.strftime('%Y-%m-%d %H:%M')} | Updated: {entry.updated_at.strftime('%Y-%m-%d %H:%M')}"
                     )
                 
                 return "\n".join(formatted_results)
@@ -102,13 +102,34 @@ class ChromaMemoMCPServer:
                     formatted_entries.append(
                         f"\n#{i}{tags_str}\n"
                         f"Content: {content_preview}\n"
-                        f"ID: {entry.id} | Created: {entry.created_at}"
+                        f"ID: {entry.id} | Created: {entry.created_at.strftime('%Y-%m-%d %H:%M')} | Updated: {entry.updated_at.strftime('%Y-%m-%d %H:%M')}"
                     )
                 
                 return "\n".join(formatted_entries)
                 
             except Exception as e:
                 return f"❌ Error listing knowledge entries: {str(e)}"
+
+        @self.mcp.tool()
+        def memo_update(project: str, entry_id: str, content: str, tags: Optional[List[str]] = None) -> str:
+            """Update a knowledge entry in a project
+            
+            Args:
+                project: Project name
+                entry_id: ID of the entry to update (supports partial IDs)
+                content: New content for the entry
+                tags: Optional new tags for the entry
+            """
+            try:
+                success = self.db.update_knowledge(project, entry_id, content, tags)
+                
+                if success:
+                    return f"✅ Knowledge entry {entry_id} updated successfully in project '{project}'\nNew content: {content[:100]}{'...' if len(content) > 100 else ''}"
+                else:
+                    return f"❌ Knowledge entry {entry_id} not found in project '{project}'"
+                
+            except Exception as e:
+                return f"❌ Error updating knowledge entry: {str(e)}"
 
         @self.mcp.tool()
         def memo_delete(project: str, entry_id: str) -> str:
@@ -243,6 +264,17 @@ class ChromaMemoMCPServer:
                 return memo_get(self.project_name, entry_id)
             
             @self.mcp.tool()
+            def update_current_project(entry_id: str, content: str, tags: Optional[List[str]] = None) -> str:
+                """Update a knowledge entry in the current project
+                
+                Args:
+                    entry_id: ID of the entry to update (supports partial IDs)
+                    content: New content for the entry
+                    tags: Optional new tags for the entry
+                """
+                return memo_update(self.project_name, entry_id, content, tags)
+            
+            @self.mcp.tool()
             def delete_from_current_project(entry_id: str) -> str:
                 """Delete a knowledge entry from the current project
                 
@@ -256,11 +288,11 @@ class ChromaMemoMCPServer:
         # Log server startup to stderr (not stdout)
         if self.project_name:
             print(f"🚀 Chroma-Memo MCP Server starting for project: {self.project_name}", file=sys.stderr)
-            print(f"📦 Available tools: memo_add, memo_search, memo_list, memo_get, memo_delete, projects_list, project_info", file=sys.stderr)
-            print(f"🎯 Project-specific tools: add_to_current_project, search_current_project, list_current_project, get_from_current_project, delete_from_current_project", file=sys.stderr)
+            print(f"📦 Available tools: memo_add, memo_search, memo_list, memo_get, memo_update, memo_delete, projects_list, project_info", file=sys.stderr)
+            print(f"🎯 Project-specific tools: add_to_current_project, search_current_project, list_current_project, get_from_current_project, update_current_project, delete_from_current_project", file=sys.stderr)
         else:
             print("🚀 Chroma-Memo MCP Server starting (all projects)", file=sys.stderr)
-            print(f"📦 Available tools: memo_add, memo_search, memo_list, memo_get, memo_delete, projects_list, project_info", file=sys.stderr)
+            print(f"📦 Available tools: memo_add, memo_search, memo_list, memo_get, memo_update, memo_delete, projects_list, project_info", file=sys.stderr)
         
         # Run the server
         self.mcp.run(transport="stdio")
